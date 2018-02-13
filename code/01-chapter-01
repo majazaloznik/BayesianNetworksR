@@ -1,5 +1,10 @@
+
+
+
+
 library(bnlearn)
 library(vcd)
+library(gRain)
 #' note that some caution must be exercised in interpreting both direct and 
 #' indirect dependencies. The presence of arrows or arcs seems to imply, at 
 #' an intuitive level, that for each arc one variable should be interpreted
@@ -61,7 +66,7 @@ bn$R
 
 coef(bn$R)
 
-## 1.4 estimating parameters
+#' ## 1.4 estimating parameters
 
 survey <- read.table("data/survey.txt", header = TRUE)
 head(survey)
@@ -81,6 +86,8 @@ prop.table(table(survey[, c("O", "E")]), margin = 2)
 mosaic(coef(bn.mle$O))
 
 
+
+
 #' alternative is to estimate the conditional probabilities in a bayesian setting 
 #' using their posterior distributions. 
 #' iss is the imaginariy sample size, that is effectively the weight given
@@ -95,7 +102,7 @@ mosaic(coef(bn.bayes$O))
 #' they also are more robist than mle and have better predictive power (p13)
 #' 
 
-# 1.5 learning the DAG structure from the
+#' # 1.5 learning the DAG structure from the
 
 
 #' the space of possible DAGs increases super-exponentially as the number of 
@@ -105,7 +112,7 @@ mosaic(coef(bn.bayes$O))
 #' conditional independence tests and network scores
 
 
-# 1.5.1 Conditional Independence tests
+#' # 1.5.1 Conditional Independence tests
 
 #' the idea here is to test the null hypothesis that two variables are 
 #' conditionally independent (independent conditional on its parents)
@@ -132,11 +139,11 @@ ci.test("T", "E", c("O", "R"), test = "x2", data = survey)
 ci.test("T", "O", "R", test = "mi", data = survey)
 ci.test("T", "O", "R", test = "x2", data = survey)
 
-# so not significant
+#' # so not significant
  
 arc.strength(dag, data = survey, criterion = "x2")
 
-# 1.5.2 networks scores
+#' ### 1.5.2 networks scores ####################################################
 #' instead of looking just at individual arcs, network scores look at the
 #' network as a whole. TWO main types are BIC - bayesian information criterion and 
 #' bayesian dirichlet equivalent uniform posterior probability of the DG 
@@ -157,3 +164,88 @@ learned <- hc(survey)
 
 modelstring(learned)
 score(learned, data = survey, type = "bic")
+
+#' ## 1.6 using Disrcete BBNs ####################################################
+
+#' you can query a BBN, either asking questions
+#' * conditional probability queries, or
+#' * conditional independence queries,
+#' * most likely explanation queries
+
+#' ### 1.6.1. Using the DAG structure ############################################
+
+#' using conditional independence queries of the DAG:
+#' investigate associations between variables, are they d-separated (conditional
+#'  on another variable). d is because we're in directed graphs. 
+
+dsep(dag,  "S", "R")
+dsep(dag,  "O", "R")
+
+#' condition on E, though, and they are separated (serial connection)
+dsep(dag,  "S", "R", "E")
+
+#' condition on E, though, and they are separated (divergent connection)
+dsep(dag,  "O", "R", "E")
+
+#'because once we know E we can decompose the joint pribability of S and R decompose
+#'once E is known:
+#'P(S,R | E) = P(S|E) P(R|E)
+#'Both S and R depend on E, therefore they become independent when you condition on E
+#'
+#'On the other hand conditioning can also make two nodes dependent when they 
+#'are marginally indepepndet. Such as Age and Sex:
+
+dsep(dag, "A", "S")
+dsep(dag, "A", "S", z = "E")
+
+#' Education depends on both age and sex, so if we know someone's education , some
+#' combinations of A and S become more likely. So when E is known, we cannot 
+#' decompose the joint distribution of A and S into a part that depeds only on A
+#' and one only on S. This is a convergent connection 
+#' 
+
+#' ### 1.6.2. Using the Conditional Probability Tables ###########################
+
+#' more complex queries require the entire local distributions. the DAg is used 
+#' indirectly, since it determines teh composition of the local distributions. 
+#' These quereis can be answered using exact or approximate inference
+
+#' #### 1.6.2.1. Exact inference #################################################
+
+#' relies on transforming the BN into a specially crafted tree to speed up
+#' the computation of conditional probabilities
+#' (make sure this is running on R 3.4.2., didn't work on 3.4.1)
+
+junction <- compile(as.grain(bn))
+
+#'  as.grain builds a junction tree,
+#'  compile computes it's probability tables. 
+
+#'  P(T)
+querygrain(junction, nodes = "T")
+ 
+#'  P(T | S = F)
+jsex <- setEvidence(junction, nodes = "S", states = "F")
+querygrain(jsex, nodes = "T")$T
+
+#' # P(T | R = small)
+jres <- setEvidence(junction, nodes = "R", states = "small")
+querygrain(jres, nodes = "T")$T
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
